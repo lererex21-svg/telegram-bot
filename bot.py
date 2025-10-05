@@ -16,7 +16,7 @@ def home():
 user_data = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! 👋 Я калькулятор размера лота.\n\nВведи свой баланс 💰:")
+    await update.message.reply_text("Assalomu alaykum! 👋 Men lot kalkulyatoriman.\n\nBalansingizni yozing 💰:")
     user_data[update.effective_chat.id] = {"step": "balance"}
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,17 +33,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             data["balance"] = float(text)
             data["step"] = "risk"
-            await update.message.reply_text("Теперь введи риск в процентах ⚠️ (например, 2):")
+            await update.message.reply_text("Endi qancha risk qilmoqchisz procentda % ⚠️ (masalan, 2):")
         except:
-            await update.message.reply_text("Введи число, например 1000")
+            await update.message.reply_text("Son yozing, masalan 1000")
 
     elif data["step"] == "risk":
         try:
             data["risk"] = float(text)
             data["step"] = "sl"
-            await update.message.reply_text("Теперь введи стоп-лосс в пипсах 📉 (например, 10):")
+            await update.message.reply_text("Nechi pips stop loss qoyasiz? 📉 (masalan, 10):")
         except:
-            await update.message.reply_text("Введи число, например 2")
+            await update.message.reply_text("Son yozing, masalan 2")
 
     elif data["step"] == "sl":
         try:
@@ -58,7 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lot_size = round(risk_money / (sl_pips * pip_value), 2)
 
             await update.message.reply_text(
-                f"💰 Баланс: {balance}\n⚠️ Риск: {risk_percent}% (${risk_money:.2f})\n📉 SL: {sl_pips} пипсов\n\n✅ Твой лот: {lot_size}"
+                f"💰 Balans: {balance}\n⚠️ Risk: {risk_percent}% (${risk_money:.2f})\n📉 SL: {sl_pips} pips\n\n✅ Sizning LOTingiz: {lot_size}"
             )
             del user_data[chat_id]
         except:
