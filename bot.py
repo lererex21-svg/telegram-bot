@@ -1,61 +1,78 @@
+from flask import Flask
+from threading import Thread
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import os
 
-DEPOSIT, RISK, SL = range(3)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "Bot is running on Render ✅"
+
+# --- Telegram part ---
+user_data = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Salom! Men lot hajmi kalkulyatoriman 💰\nHisobingizdagi depozitni kiriting ($):")
-    return DEPOSIT
+    await update.message.reply_text("Привет! 👋 Я калькулятор размера лота.\n\nВведи свой баланс 💰:")
+    user_data[update.effective_chat.id] = {"step": "balance"}
 
-async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["deposit"] = float(update.message.text)
-    await update.message.reply_text("Riski miqdorini kiriting ($):")
-    return RISK
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    text = update.message.text.strip()
 
-async def risk(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["risk_dollars"] = float(update.message.text)
-    await update.message.reply_text("Stop-lossni kiriting (pips):")
-    return SL
+    if chat_id not in user_data:
+        await update.message.reply_text("Напиши /start, чтобы начать 🙂")
+        return
 
-async def sl(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    deposit = context.user_data["deposit"]
-    risk_dollars = context.user_data["risk_dollars"]
-    sl_pips = float(update.message.text)
+    data = user_data[chat_id]
 
-    # XAUUSD uchun 1 lot = $1 har 1 pipda (taxminan)
-    lot = risk_dollars / (sl_pips * 10)  # har 10 pips uchun $10 yo'qotish
+    if data["step"] == "balance":
+        try:
+            data["balance"] = float(text)
+            data["step"] = "risk"
+            await update.message.reply_text("Теперь введи риск в процентах ⚠️ (например, 2):")
+        except:
+            await update.message.reply_text("Введи число, например 1000")
 
-    await update.message.reply_text(
-        f"💰 Depozit: ${deposit}\n"
-        f"⚠️ Risk: ${risk_dollars:.2f}\n"
-        f"📏 Stop: {sl_pips} pips\n\n"
-        f"➡️ Lot hajmi: **{lot:.2f}**"
-    )
-    return ConversationHandler.END
+    elif data["step"] == "risk":
+        try:
+            data["risk"] = float(text)
+            data["step"] = "sl"
+            await update.message.reply_text("Теперь введи стоп-лосс в пипсах 📉 (например, 10):")
+        except:
+            await update.message.reply_text("Введи число, например 2")
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bekor qilindi ❌")
-    return ConversationHandler.END
+    elif data["step"] == "sl":
+        try:
+            data["sl"] = float(text)
+            # --- Расчёт ---
+            balance = data["balance"]
+            risk_percent = data["risk"]
+            sl_pips = data["sl"]
 
-def main():
-    import os
-    from telegram.ext import ApplicationBuilder
+            risk_money = balance * (risk_percent / 100)
+            pip_value = 10  # Для XAUUSD 1 лот = $1/pip
+            lot_size = round(risk_money / (sl_pips * pip_value), 2)
 
-    BOT_TOKEN = os.getenv("BOT_TOKEN")
+            await update.message.reply_text(
+                f"💰 Баланс: {balance}\n⚠️ Риск: {risk_percent}% (${risk_money:.2f})\n📉 SL: {sl_pips} пипсов\n\n✅ Твой лот: {lot_size}"
+            )
+            del user_data[chat_id]
+        except:
+            await update.message.reply_text("Ошибка ввода. Попробуй снова.")
+
+def run_flask():
+    app_flask.run(host="0.0.0.0", port=10000)
+
+def run_telegram():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            DEPOSIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, deposit)],
-            RISK: [MessageHandler(filters.TEXT & ~filters.COMMAND, risk)],
-            SL: [MessageHandler(filters.TEXT & ~filters.COMMAND, sl)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-
-    app.add_handler(conv_handler)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    Thread(target=run_flask).start()
+    run_telegram()
