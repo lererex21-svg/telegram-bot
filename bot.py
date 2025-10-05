@@ -1,78 +1,81 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+import telebot
 
-BOT_TOKEN = "8366398067:AAESiea7a2XTb7frVhDXUxFBJ14kSZyEoOg"  # bu yerga o'z bot tokeningni yoz
+TOKEN = "8366398067:AAESiea7a2XTb7frVhDXUxFBJ14kSZyEoOg"  # masalan: 8194345051:AAEOvCjpOU3hyXbPrOW3AtR8BHoL9epMunc
+bot = telebot.TeleBot(TOKEN)
 
-# holatlar
-BALANCE, RISK, STOP = range(3)
+user_data = {}
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Salom! Men XAUUSD uchun lot kalkulyatoriman 💰\n"
-        "Keling, hisoblaymiz.\n\n"
-        "💵 Avvalo balansni kiriting (misol: 300):"
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.send_message(message.chat.id, "💰 Risk Kalkulyatori\n\nHisob hajmini kiriting (masalan: 5000):")
+    bot.register_next_step_handler(message, get_account_size)
+
+def get_account_size(message):
+    try:
+        account_size = float(message.text)
+        user_data[message.chat.id] = {'account_size': account_size}
+        bot.send_message(message.chat.id, "💵 Risk miqdorini kiriting ($ da, masalan: 100):")
+        bot.register_next_step_handler(message, get_risk_dollars)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Noto‘g‘ri raqam. Iltimos, faqat raqam kiriting.")
+        bot.register_next_step_handler(message, get_account_size)
+
+def get_risk_dollars(message):
+    try:
+        risk_dollars = float(message.text)
+        user_data[message.chat.id]['risk_dollars'] = risk_dollars
+        bot.send_message(message.chat.id, "📉 Stop-loss hajmini kiriting (pipda, masalan: 10):")
+        bot.register_next_step_handler(message, get_stop_loss)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Iltimos, faqat raqam kiriting.")
+        bot.register_next_step_handler(message, get_risk_dollars)
+
+def get_stop_loss(message):
+    try:
+        stop_loss = float(message.text)
+        user_data[message.chat.id]['stop_loss'] = stop_loss
+        bot.send_message(message.chat.id, "📊 Siz qaysi juftlikni ishlatyapsiz?\nMasalan: XAUUSD, EURUSD...")
+        bot.register_next_step_handler(message, get_pair)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Iltimos, faqat raqam kiriting.")
+        bot.register_next_step_handler(message, get_stop_loss)
+
+def get_pair(message):
+    pair = message.text.upper()
+    user_data[message.chat.id]['pair'] = pair
+    calculate_lot(message)
+
+def calculate_lot(message):
+    data = user_data[message.chat.id]
+    account_size = data['account_size']
+    risk_dollars = data['risk_dollars']
+    stop_loss = data['stop_loss']
+    pair = data['pair']
+
+    # Pip qiymatini aniqlash
+    if "JPY" in pair:
+        pip_value = 0.01
+    else:
+        pip_value = 0.1
+
+    # XAUUSD uchun alohida
+    if pair == "XAUUSD":
+        pip_value = 1
+
+    # Lot hisoblash formulasi
+    lot = risk_dollars / (stop_loss * pip_value * 10)
+
+    bot.send_message(
+        message.chat.id,
+        f"✅ Hisoblash tugadi!\n\n"
+        f"💼 Hisob hajmi: ${account_size:,.2f}\n"
+        f"💵 Risk: ${risk_dollars:,.2f}\n"
+        f"📉 Stop-loss: {stop_loss} pip\n"
+        f"💱 Juftlik: {pair}\n\n"
+        f"📈 Lot hajmi: {lot:.2f}"
     )
-    return BALANCE
 
-async def balance_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        balance = float(update.message.text)
-        context.user_data["balance"] = balance
-        await update.message.reply_text("⚠️ Riskni $ da kiriting (misol: 45):")
-        return RISK
-    except ValueError:
-        await update.message.reply_text("Iltimos, raqam kiriting. Masalan: 300")
-        return BALANCE
+    bot.send_message(message.chat.id, "Yana hisoblash uchun /start ni bosing 🔁")
 
-async def risk_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        risk = float(update.message.text)
-        context.user_data["risk"] = risk
-        await update.message.reply_text("📉 Stop lossni pipsda kiriting (misol: 20):")
-        return STOP
-    except ValueError:
-        await update.message.reply_text("Iltimos, raqam kiriting. Masalan: 45")
-        return RISK
-
-async def stop_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        stop = float(update.message.text)
-        balance = context.user_data["balance"]
-        risk = context.user_data["risk"]
-
-        # 1 pips = $1 (1 lot uchun), ammo XAUUSD uchun /10
-        lot_size = (risk / (stop * 1)) / 10
-
-        await update.message.reply_text(
-            f"✅ Hisoblash tugadi:\n\n"
-            f"💵 Balans: {balance}$\n"
-            f"⚠️ Risk: {risk}$\n"
-            f"📉 Stop: {stop} pips\n"
-            f"📊 Lot hajmi: {lot_size:.2f} lot"
-        )
-        return ConversationHandler.END
-
-    except ValueError:
-        await update.message.reply_text("Iltimos, raqam kiriting. Masalan: 20")
-        return STOP
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bekor qilindi ❌")
-    return ConversationHandler.END
-
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-conv = ConversationHandler(
-    entry_points=[CommandHandler("start", start)],
-    states={
-        BALANCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, balance_input)],
-        RISK: [MessageHandler(filters.TEXT & ~filters.COMMAND, risk_input)],
-        STOP: [MessageHandler(filters.TEXT & ~filters.COMMAND, stop_input)],
-    },
-    fallbacks=[CommandHandler("cancel", cancel)],
-)
-
-app.add_handler(conv)
-
-if __name__ == "__main__":
-    app.run_polling()
+print("🤖 Bot ishga tushdi...")
+bot.polling(non_stop=True)
