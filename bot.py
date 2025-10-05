@@ -58,7 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lot_size = round(risk_money / (sl_pips * pip_value), 2)
 
             await update.message.reply_text(
-                f"💰 Balans: {balance}\n⚠️ Risk: {risk_money}% (${risk_money:.2f})\n📉 SL: {sl_pips} pips\n\n✅ Sizning LOTingiz: {lot_size}"
+                f"💰 Balans: {balance}\n⚠️ Risk: ${risk_money:.2f}\n📉 SL: {sl_pips} pips\n\n✅ Sizning LOTingiz: {lot_size}"
             )
             del user_data[chat_id]
         except:
