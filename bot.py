@@ -33,13 +33,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             data["balance"] = float(text)
             data["step"] = "risk"
-            await update.message.reply_text("Endi qancha risk qilmoqchisz procentda % ⚠️ (masalan, 2):")
+            await update.message.reply_text("Endi qancha risk qilmoqchisz $ ⚠️ (masalan, 2):")
         except:
             await update.message.reply_text("Son yozing, masalan 1000")
 
     elif data["step"] == "risk":
         try:
-            data["risk"] = float(text)
+            data["risk_money"] = float(text)
             data["step"] = "sl"
             await update.message.reply_text("Nechi pips stop loss qoyasiz? 📉 (masalan, 10):")
         except:
@@ -50,7 +50,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data["sl"] = float(text)
             # --- Расчёт ---
             balance = data["balance"]
-            risk_percent = data["risk"]
+            risk_money = data["risk"]
             sl_pips = data["sl"]
 
             risk_money = balance * (risk_percent / 100)
@@ -58,7 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lot_size = round(risk_money / (sl_pips * pip_value), 2)
 
             await update.message.reply_text(
-                f"💰 Balans: {balance}\n⚠️ Risk: {risk_percent}% (${risk_money:.2f})\n📉 SL: {sl_pips} pips\n\n✅ Sizning LOTingiz: {lot_size}"
+                f"💰 Balans: {balance}\n⚠️ Risk: {risk_money}% (${risk_money:.2f})\n📉 SL: {sl_pips} pips\n\n✅ Sizning LOTingiz: {lot_size}"
             )
             del user_data[chat_id]
         except:
