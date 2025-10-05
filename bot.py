@@ -33,7 +33,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             data["balance"] = float(text)
             data["step"] = "risk"
-            await update.message.reply_text("Endi qancha risk qilmoqchisz $ ⚠️ (masalan, 2):")
+            await update.message.reply_text("Endi risk summasini yozing $ 💵 (masalan, 50):")
         except:
             await update.message.reply_text("Son yozing, masalan 1000")
 
@@ -43,17 +43,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data["step"] = "sl"
             await update.message.reply_text("Nechi pips stop loss qoyasiz? 📉 (masalan, 10):")
         except:
-            await update.message.reply_text("Son yozing, masalan 2")
+            await update.message.reply_text("Son yozing, masalan 50")
 
     elif data["step"] == "sl":
         try:
             data["sl"] = float(text)
             # --- Расчёт ---
             balance = data["balance"]
-            risk_money = data["risk"]
+            risk_money = data["risk_money"]
             sl_pips = data["sl"]
 
-            risk_money = balance * (risk_percent / 100)
             pip_value = 10  # Для XAUUSD 1 лот = $1/pip
             lot_size = round(risk_money / (sl_pips * pip_value), 2)
 
